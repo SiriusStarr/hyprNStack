@@ -6,22 +6,11 @@
 #include <unistd.h>
 #include <thread>
 // Methods
-inline std::unique_ptr<CHyprNstackLayout> g_pNstackLayout;
+inline std::unique_ptr<Layout::Tiled::CHyprNstackAlgorithm> g_pNstackLayout;
 
 // Do NOT change this function.
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
-}
-
-static void deleteWorkspaceData(int ws) {
-    if (g_pNstackLayout)
-        g_pNstackLayout->removeWorkspaceData(ws);
-}
-
-void moveWorkspaceCallback(void* self, SCallbackInfo& cinfo, std::any data) {
-    std::vector<std::any> moveData = std::any_cast<std::vector<std::any>>(data);
-    PHLWORKSPACE          ws       = std::any_cast<PHLWORKSPACE>(moveData.front());
-    deleteWorkspaceData(ws->m_id);
 }
 
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
@@ -37,16 +26,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:nstack:layout:center_single_master", Hyprlang::INT{0});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:nstack:layout:mfact", Hyprlang::FLOAT{0.5f});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:nstack:layout:single_mfact", Hyprlang::FLOAT{0.5f});
-    g_pNstackLayout  = std::make_unique<CHyprNstackLayout>();
-    static auto MWCB = HyprlandAPI::registerCallbackDynamic(PHANDLE, "moveWorkspace", moveWorkspaceCallback);
-
-    static auto DWCB = HyprlandAPI::registerCallbackDynamic(PHANDLE, "destroyWorkspace", [&](void* self, SCallbackInfo&, std::any data) {
-        CWorkspace* ws = std::any_cast<CWorkspace*>(data);
-        deleteWorkspaceData(ws->m_id);
-    });
-
-    HyprlandAPI::addLayout(PHANDLE, "nstack", g_pNstackLayout.get());
-
+    g_pNstackLayout  = std::make_unique<Layout::Tiled::CHyprNstackAlgorithm>();
+	  if (!HyprlandAPI::addTiledAlgo(PHANDLE, "nStack", &typeid(Layout::Tiled::CHyprNstackAlgorithm), [] { return makeUnique<Layout::Tiled::CHyprNstackAlgorithm>(); })) {
+			HyprlandAPI::addNotification(PHANDLE, "[hyprgollum] addTiledAlgo failed! Can't proceed.", CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
+    }
     HyprlandAPI::reloadConfig();
 
     return {"hyprNStack", "Plugin for column layout", "Zakk", "1.0"};
